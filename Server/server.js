@@ -6,39 +6,49 @@ const app = express();
 require("express-ws")(app);
 const PORT = process.env.PORT || 3000;
 
-let nextConnectionId = 1;
-let espConnections = new Map();
+const espConnections = new Map();
 
 app.use(express.json());
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`LAN Address: ${getWifiAddress()}:${PORT}`);
+// 1. The Security Camera (Logs all incoming traffic)
+app.use((req, res, next) => {
+  console.log(
+    `[TRAFFIC] ${req.method} request to "${req.url}" from ${req.socket.remoteAddress}`,
+  );
+  next();
 });
 
-app.ws("/connect-esp", authenticatePassword, (ws, req) => {
+// ==========================================
+// 🚨 THE FIX: Separate the middleware from the ws() route
+// Force Express to run the password check on this path FIRST
+// ==========================================
+app.use("/connect-esp", authenticatePassword);
+
+app.ws("/connect-esp", (ws, req) => {
   const deviceId = req.headers["x-device-id"];
 
   if (!deviceId) {
-    ws.close(1008, "Missing device ID");
+    console.log("-> ❌ Connection rejected: No x-device-id header provided.");
+    ws.close(1008, "Device ID required");
     return;
   }
 
-  // Handling ghost connections, if a device reconnects without properly closing the previous connection
+  // Clean up ghost connections
   if (espConnections.has(deviceId)) {
-    console.log(`Cleaning up old dead connection for ESP: ${deviceId}`);
+    console.log(`-> 🧹 Cleaning up old connection for ESP: ${deviceId}`);
     espConnections.get(deviceId).terminate();
   }
 
   ws.connectionId = deviceId;
   espConnections.set(deviceId, ws);
-  console.log(
-    `Connection "${ws.connectionId}" established with ESP ${req.socket.remoteAddress}`,
-  );
+
+  console.log(`-> ✅ Connection established with ESP ID: ${deviceId}`);
 
   ws.on("close", () => {
-    console.log(`WebSocket connection "${ws.connectionId}" closed`);
-    espConnections.delete(deviceId);
+    console.log(`-> 🔌 WebSocket connection closed for ESP: ${deviceId}`);
+    if (espConnections.get(deviceId) === ws) {
+      espConnections.delete(deviceId);
+    }
   });
 });
 
@@ -53,11 +63,12 @@ function broadcastToESP(data = {}) {
     return;
   }
 
-  espConnections.forEach((ws) => {
+  espConnections.forEach((ws, deviceId) => {
     if (ws.readyState === 1) {
       ws.send(JSON.stringify(data));
     }
   });
+
   console.log(
     `Broadcasted ${JSON.stringify(data)} to ${espConnections.size} ESP connections`,
   );
@@ -65,9 +76,12 @@ function broadcastToESP(data = {}) {
 
 function authenticatePassword(req, res, next) {
   const password = req.headers["x-password"];
-  if (password === process.env.PASSWORD) {
+  const expectedPassword = process.env.PASSWORD;
+
+  if (password === expectedPassword) {
     next();
   } else {
+    console.log("Auth Failed: Rejecting connection.");
     res.status(401).send("Unauthorized");
   }
 }
@@ -85,3 +99,13 @@ function getWifiAddress() {
   }
   return "Adapter not found or no IPv4 assigned";
 }
+
+app.use((req, res) => {
+  console.log(`404 Not Found`);
+  res.status(404).send("Not Found");
+});
+
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+  console.log(`Server IP Address: ${getWifiAddress()}:${PORT}`);
+});
