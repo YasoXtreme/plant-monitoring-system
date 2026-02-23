@@ -4,9 +4,9 @@
 const char* ssid = "Yaso's A15";
 const char* password = "SpilledChip9978";
 
-const char* websockets_server = "ws://192.168.1.XXX:3000/connect-esp"; 
+const char* websockets_server = "ws://10.139.223.51:3000/connect-esp"; 
 
-const char* server_password = "YOUR_SECRET_PASSWORD"; 
+const char* server_password = "SpilledChip9978"; 
 
 using namespace websockets;
 WebsocketsClient client;
@@ -40,6 +40,13 @@ void setup() {
     }
   });
 
+  String macAddress = WiFi.macAddress();
+  Serial.print("My Device ID (MAC): ");
+  Serial.println(macAddress);
+
+  client.addHeader("x-password", server_password);
+  client.addHeader("x-device-id", macAddress);
+
   connectToWebSocket();
 }
 
@@ -60,13 +67,6 @@ void loop() {
 }
 
 void connectToWebSocket() {
-  String macAddress = WiFi.macAddress();
-  Serial.print("My Device ID (MAC): ");
-  Serial.println(macAddress);
-
-  client.addHeader("x-password", server_password);
-  client.addHeader("x-device-id", macAddress);
-
   Serial.println("Connecting to Node.js server...");
   bool connected = client.connect(websockets_server);
   
