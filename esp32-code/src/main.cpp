@@ -1,5 +1,7 @@
 #include <Arduino.h>
 #include <DHT.h>
+#include <WiFi.h>
+#include <ArduinoWebsockets.h>
 
 int increasePin = 12;
 int decreasePin = 14;
@@ -62,7 +64,7 @@ void loop() {
   digitalWrite(decreasePin, LOW);
 
   //Flow rate sensor
-    // Calculate flow every 1 second
+  // Calculate flow every 1 second
   if ((millis() - oldTime) > 1000) {
     
     // Disable interrupts while reading/resetting pulseCount to avoid data corruption
