@@ -3,9 +3,11 @@
 #include <WiFi.h>
 #include <ArduinoWebsockets.h>
 
-int increasePin = 12;
-int decreasePin = 14;
-const int sensorPin = 36; 
+const int increasePin = 12;
+const int decreasePin = 14;
+const int flowSensorPin = 36; 
+const int ldrSensorPin = 34; 
+const int soilMoisturePin = 35;
 
 // Variables for pulse counting
 volatile long pulseCount = 0;
@@ -35,8 +37,8 @@ void setup() {
   pinMode(decreasePin, OUTPUT);
   dht.begin();
 
-  pinMode(sensorPin, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(sensorPin), pulseCounter, FALLING);
+  pinMode(flowSensorPin, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(flowSensorPin), pulseCounter, FALLING);
   oldTime = millis();
   delay(2000);
   Serial.begin(115200);
@@ -68,7 +70,7 @@ void loop() {
   if ((millis() - oldTime) > 1000) {
     
     // Disable interrupts while reading/resetting pulseCount to avoid data corruption
-    detachInterrupt(digitalPinToInterrupt(sensorPin));
+    detachInterrupt(digitalPinToInterrupt(flowSensorPin));
     
     // The YF-S201 characteristic: Frequency (Hz) = 7.5 * Q (L/min)
     // Q = pulses / 7.5
@@ -90,9 +92,17 @@ void loop() {
 
     // Reset pulse count for the next second
     pulseCount = 0;
-    
-    // Re-enable interrupts
-    attachInterrupt(digitalPinToInterrupt(sensorPin), pulseCounter, FALLING);
+    attachInterrupt(digitalPinToInterrupt(flowSensorPin), pulseCounter, FALLING);
+
+    //ldrSensorPin
+    int ldrValue = analogRead(ldrSensorPin);
+    Serial.print("LDR Value: ");
+    Serial.println(ldrValue);
+
+    //soilMoisture
+    int soilMoistureValue = analogRead(soilMoisturePin);
+    Serial.print("Soil Moisture value: ");
+    Serial.println(soilMoistureValue);
 }
 }
 
