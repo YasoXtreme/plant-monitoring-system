@@ -7,7 +7,7 @@ require("express-ws")(app);
 const PORT = process.env.PORT || 3000;
 
 let nextConnectionId = 1;
-let espConnections = [];
+let espConnections = new Map();
 
 app.use(express.json());
 
@@ -17,15 +17,28 @@ app.listen(PORT, () => {
 });
 
 app.ws("/connect-esp", authenticatePassword, (ws, req) => {
-  espConnections.push(ws);
-  ws.connectionId = nextConnectionId++;
+  const deviceId = req.headers["x-device-id"];
+
+  if (!deviceId) {
+    ws.close(1008, "Missing device ID");
+    return;
+  }
+
+  // Handling ghost connections, if a device reconnects without properly closing the previous connection
+  if (espConnections.has(deviceId)) {
+    console.log(`Cleaning up old dead connection for ESP: ${deviceId}`);
+    espConnections.get(deviceId).terminate();
+  }
+
+  ws.connectionId = deviceId;
+  espConnections.set(deviceId, ws);
   console.log(
-    `Connection ${ws.connectionId} established with ESP ${req.socket.remoteAddress}`,
+    `Connection "${ws.connectionId}" established with ESP ${req.socket.remoteAddress}`,
   );
 
   ws.on("close", () => {
-    console.log(`WebSocket connection ${ws.connectionId} closed`);
-    espConnections = espConnections.filter((conn) => conn !== ws);
+    console.log(`WebSocket connection "${ws.connectionId}" closed`);
+    espConnections.delete(deviceId);
   });
 });
 
@@ -35,7 +48,7 @@ app.post("/update-values", authenticatePassword, (req, res) => {
 });
 
 function broadcastToESP(data = {}) {
-  if (espConnections.length === 0) {
+  if (espConnections.size === 0) {
     console.log("No ESP connections available to broadcast");
     return;
   }
@@ -46,7 +59,7 @@ function broadcastToESP(data = {}) {
     }
   });
   console.log(
-    `Broadcasted ${JSON.stringify(data)} to ${espConnections.length} ESP connections`,
+    `Broadcasted ${JSON.stringify(data)} to ${espConnections.size} ESP connections`,
   );
 }
 
