@@ -118,12 +118,8 @@ bool actuate(float current, float target, float innerTolerance, float outerToler
   current += calibration;
   float minimumInner = target - innerTolerance, maximumInner = target + innerTolerance, minimumOuter = target - outerTolerance, maximumOuter = target + outerTolerance;
    
-  if (!inBetween(current, minimumOuter, maximumOuter)) {
-    state = false;
-  }
-  else if (inBetween(current, minimumInner, maximumInner)) {
-    state = true;
-  }
+  // Force FALSE if outside outer bounds. Force TRUE if inside inner bounds. Otherwise, hold current state.
+  state = inBetween(current, minimumOuter, maximumOuter) && (inBetween(current, minimumInner, maximumInner) || state);
 
   if (!state) takeAction(target, current, increase, decrease);
   return state;
