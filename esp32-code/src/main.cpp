@@ -2,134 +2,225 @@
 #include <DHT.h>
 #include <WiFi.h>
 #include <ArduinoWebsockets.h>
+#include <math.h>
+#include "engine.h"
 
-const int increasePin = 12;
-const int decreasePin = 14;
-const int flowSensorPin = 36; 
-const int ldrSensorPin = 34; 
-const int soilMoisturePin = 35;
+float readLightSensor();
+float readSoilMoisture();
+float readTemperature();
+float readHumidity();
+float readFlowRate();
+void increaseTemperature();
+void decreaseTemperature();
+void increaseHumidity();
+void decreaseHumidity();
+void increaseSoilMoisture();
+void decreaseSoilMoisture();
+void increaseLight();
+void decreaseLight();
+void increaseFlowRate();
+void decreaseFlowRate();
+void setupEngine();
+void setupPins();
+void connectWifi();
+void setupWebsocket();
+void connectToWebSocket();
 
-// Variables for pulse counting
-volatile long pulseCount = 0;
-float flowRate = 0.0;
-unsigned int flowMilliLitres = 0;
-unsigned long totalMilliLitres = 0;
-unsigned long oldTime = 0;
+const int DHT_PIN = 13;
+const int LDR_PIN = 34;
+const int SOIL_MOISTURE_PIN = 35;
+const int FLOW_SENSOR_PIN = 36;
 
-// float temp = 15;
+const char* SSID = "Yaso's A15";
+const char* PASSWORD = "SpilledChip9978";
+const char* SERVER_URL = "ws://10.192.141.51:3000/connect-esp";
+const char* SERVER_PASSWORD = "SpilledChip9978";
 
-void IRAM_ATTR pulseCounter() {
-  pulseCount++;
+volatile int pulseCount = 0;
+const int CONNECTION_ATTEMPTS_BEFORE_START = 20;
+
+DHT dht(DHT_PIN, DHT11);
+Engine engine;
+
+using namespace websockets;
+WebsocketsClient client;
+
+void IRAM_ATTR countPulse() {
+    pulseCount++;
 }
-void increaseTemp();
-void decreaseTemp();
-bool inBetween(float x, float minimum, float maximum);
-void takeAction(float target, float current, void (*increase)(), void (*decrease)());
-bool actuate(float current, float target, float innerTolerance, float outerTolerance, void (*increase)(), void (*decrease)(), bool state, float calibration = 0);
-
-bool temperatureState = false;
-bool sensorState = false;
-
-DHT dht(26, DHT11);
 
 void setup() {
-  pinMode(increasePin, OUTPUT);
-  pinMode(decreasePin, OUTPUT);
-  dht.begin();
+    dht.begin();
+    Serial.begin(115200);
 
-  pinMode(flowSensorPin, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(flowSensorPin), pulseCounter, FALLING);
-  oldTime = millis();
-  delay(2000);
-  Serial.begin(115200);
+    connectWifi();
+    setupWebsocket();
+    connectToWebSocket();
+    setupPins();
+    setupEngine();
 }
 
 void loop() {
-  // if (temp == 24) sensorState = true;
-  // if (temp == 14) sensorState = false;
+    engine.run(1);
+    if (WiFi.status() == WL_CONNECTED) {
+         if (client.available()) {
+            client.poll();
+        } else {
+            Serial.println("WebSocket disconnected. Attempting to reconnect.");
+            connectToWebSocket();
+        }
+    } 
+    delay(1000);
+}
+
+void connectToWebSocket() {
+    if (WiFi.status() != WL_CONNECTED) return;
+    Serial.println("Connecting to Node.js server...");
+    bool connected = client.connect(SERVER_URL);
   
-  // if (sensorState) temp -= 0.5;
-  // else temp += 0.5;
-  
-  //Temp & Humidity sensor
-  float temp = dht.readTemperature();
-  float humidity = dht.readHumidity();
+    if (connected) {
+        Serial.println("Successfully connected to the server!");    
+    } else {
+        Serial.println("Failed to connect to the server.");
+    }
+}
 
-  Serial.print("Temp: ");
-  Serial.print(temp);
-  Serial.print(" C, Humidity: ");
-  Serial.print(humidity);
-  Serial.println(" %");
-  temperatureState = actuate(temp, 23, 1, 3, increaseTemp, decreaseTemp, temperatureState, 0);
-  delay(2000);
-  digitalWrite(increasePin, LOW);
-  digitalWrite(decreasePin, LOW);
+void setupWebsocket() {
+    client.onMessage([](WebsocketsMessage message) {
+        Serial.print("Received Data: ");
+        Serial.println(message.data());
+        engine.updateFromJSON(message.data());
+    });
 
-  //Flow rate sensor
-  // Calculate flow every 1 second
-  if ((millis() - oldTime) > 1000) {
-    
-    // Disable interrupts while reading/resetting pulseCount to avoid data corruption
-    detachInterrupt(digitalPinToInterrupt(flowSensorPin));
-    
-    // The YF-S201 characteristic: Frequency (Hz) = 7.5 * Q (L/min)
-    // Q = pulses / 7.5
-    flowRate = (pulseCount / 7.5); 
-    
-    oldTime = millis();
-    
-    // Calculate volume passed in this second
-    flowMilliLitres = (flowRate / 60) * 1000;
-    totalMilliLitres += flowMilliLitres;
+    client.onEvent([](WebsocketsEvent event, String data) {
+        if(event == WebsocketsEvent::ConnectionOpened) {
+            Serial.println("WebSocket Connection Opened!");
+        } else if(event == WebsocketsEvent::ConnectionClosed) {
+            Serial.println("WebSocket Connection Closed!");
+        }
+    });
 
-    // Print results
-    Serial.print("Flow rate: ");
-    Serial.print(flowRate);
-    Serial.print(" L/min");
-    Serial.print("\t Total: ");
-    Serial.print(totalMilliLitres);
-    Serial.println(" mL");
+    String macAddress = WiFi.macAddress();
+    Serial.print("My Device ID (MAC): ");
+    Serial.println(macAddress);
 
-    // Reset pulse count for the next second
+    client.addHeader("x-password", SERVER_PASSWORD);
+    client.addHeader("x-device-id", macAddress);
+
+}
+
+void connectWifi() {
+    WiFi.begin(SSID, PASSWORD);
+    Serial.print("Connecting to Wi-Fi");
+    for (int i = 0; i < CONNECTION_ATTEMPTS_BEFORE_START; i++)
+    {
+        if (WiFi.status() == WL_CONNECTED) break;
+        Serial.print(".");
+        delay(500);
+    }
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("\nWi-Fi Connected!");
+        Serial.println("IP Address: " + String(WiFi.localIP()));
+    } else {
+        Serial.println("\nTimed Out!!");
+    }
+}
+
+void setupPins() {
+    pinMode(FLOW_SENSOR_PIN, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(FLOW_SENSOR_PIN), countPulse, FALLING);
+}
+
+void setupEngine() {
+    engine.registerParameter("Temperature", 25.0, 1.0, 3.0, 0.0, readTemperature, increaseTemperature, decreaseTemperature);
+    engine.registerParameter("Humidity", 60.0, 5.0, 15.0, 0.0, readHumidity, increaseHumidity, decreaseHumidity);
+    engine.registerParameter("Soil Moisture", 50.0, 5.0, 20.0, 0.0, readSoilMoisture, increaseSoilMoisture, decreaseSoilMoisture);
+    engine.registerParameter("Light", 300.0, 50.0, 150.0, 0.0, readLightSensor, increaseLight, decreaseLight);
+    engine.registerParameter("Flow Rate", 0.1, 0.2, 0.5, 0.0, readFlowRate, increaseFlowRate, decreaseFlowRate);
+}
+
+float readFlowRate() {
+    noInterrupts();
+    int count = pulseCount;
     pulseCount = 0;
-    attachInterrupt(digitalPinToInterrupt(flowSensorPin), pulseCounter, FALLING);
+    interrupts();
 
-    //ldrSensorPin
-    int ldrValue = analogRead(ldrSensorPin);
-    Serial.print("LDR Value: ");
-    Serial.println(ldrValue);
-
-    //soilMoisture
-    int soilMoistureValue = analogRead(soilMoisturePin);
-    Serial.print("Soil Moisture value: ");
-    Serial.println(soilMoistureValue);
-}
+    float flowRate = (count / 7.5);
+    return flowRate;
 }
 
-void increaseTemp() {
-  digitalWrite(increasePin, HIGH);
+float readSoilMoisture() {
+    const int DRY_CALIBRATION_VALUE = 4095;
+    const int WET_CALIBRATION_VALUE = 857;
+
+    int rawValue = analogRead(SOIL_MOISTURE_PIN);
+    float soilMoisturePercentage = map(rawValue, DRY_CALIBRATION_VALUE, WET_CALIBRATION_VALUE, 0, 100);
+    soilMoisturePercentage = constrain(soilMoisturePercentage, 0, 100);
+
+    return soilMoisturePercentage;
 }
 
-void decreaseTemp() {
-  digitalWrite(decreasePin, HIGH);
+float readTemperature() {
+    return dht.readTemperature();
 }
 
-bool actuate(float current, float target, float innerTolerance, float outerTolerance, void (*increase)(), void (*decrease)(), bool state, float calibration) {
-  current += calibration;
-  float minimumInner = target - innerTolerance, maximumInner = target + innerTolerance, minimumOuter = target - outerTolerance, maximumOuter = target + outerTolerance;
-   
-  // Force FALSE if outside outer bounds. Force TRUE if inside inner bounds. Otherwise, hold current state.
-  state = inBetween(current, minimumOuter, maximumOuter) && (inBetween(current, minimumInner, maximumInner) || state);
-
-  if (!state) takeAction(target, current, increase, decrease);
-  return state;
+float readHumidity() {
+    return dht.readHumidity();
 }
 
-void takeAction(float target, float current, void (*increase)(), void (*decrease)()) {
-  if (current > target) decrease();
-  if (current < target) increase();
+float readLightSensor() {
+    const float GAMMA = 0.6;
+    const float R10 = 15000.0;
+    const float FIXED_RESISTOR = 10000.0;
+
+    int rawValue = analogRead(LDR_PIN);
+  
+    if (rawValue == 0) return 0.0;
+    if (rawValue == 4095) return 100000.0;
+
+    float voltage = rawValue * (3.3 / 4095.0);
+    float rLDR = FIXED_RESISTOR * ((3.3 - voltage) / voltage);
+    float lux = 10.0 * pow((R10 / rLDR), (1.0 / GAMMA));
+
+    return lux;
 }
 
-bool inBetween(float x, float minimum, float maximum) {
-  return (x > minimum && x < maximum);
+void increaseTemperature() {
+    // Serial.println("[Action] Increasing temperature (e.g., turning on heater)");
+}
+
+void decreaseTemperature() {
+    // Serial.println("[Action] Decreasing temperature (e.g., turning off heater)");
+}
+
+void increaseHumidity() {
+    // Serial.println("[Action] Increasing humidity (e.g., turning on humidifier)");
+}
+
+void decreaseHumidity() {
+    // Serial.println("[Action] Decreasing humidity (e.g., turning off humidifier)");
+}
+
+void increaseSoilMoisture() {
+    // Serial.println("[Action] Increasing soil moisture (e.g., watering)");
+}
+
+void decreaseSoilMoisture() {
+    // Serial.println("[Action] Decreasing soil moisture (e.g., stopping watering)");
+}
+
+void increaseLight() {
+    // Serial.println("[Action] Increasing light (e.g., turning on lights)");
+}
+
+void decreaseLight() {
+    // Serial.println("[Action] Decreasing light (e.g., turning off lights)");
+}
+
+void increaseFlowRate() {
+    // Serial.println("[Action] Increasing flow rate (e.g., turning on pump)");
+}
+
+void decreaseFlowRate() {
+    // Serial.println("[Action] Decreasing flow rate (e.g., turning off pump)");
 }

@@ -10,7 +10,6 @@ const espConnections = new Map();
 
 app.use(express.json());
 
-// 1. The Security Camera (Logs all incoming traffic)
 app.use((req, res, next) => {
   console.log(
     `[TRAFFIC] ${req.method} request to "${req.url}" from ${req.socket.remoteAddress}`,
@@ -18,10 +17,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// ==========================================
-// 🚨 THE FIX: Separate the middleware from the ws() route
-// Force Express to run the password check on this path FIRST
-// ==========================================
 app.use("/connect-esp", authenticatePassword);
 
 app.ws("/connect-esp", (ws, req) => {
@@ -51,6 +46,15 @@ app.ws("/connect-esp", (ws, req) => {
     }
   });
 });
+
+/*
+  Expects: {
+    "parameter": "parameter name",
+    "target": target_value,
+    "inner": inner_tolernace,
+    "outer": outer_tolerance
+  }
+*/
 
 app.post("/update-values", authenticatePassword, (req, res) => {
   broadcastToESP(req.body);
