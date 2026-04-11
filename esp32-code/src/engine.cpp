@@ -6,27 +6,38 @@ bool Engine::inBetween(float x, float minimum, float maximum) {
     return (x > minimum && x < maximum);
 }
 
-void Engine::takeAction(float target, float current, void (*increase)(), void (*decrease)()) {
-    if (current > target) decrease();
-    if (current < target) increase();
+int Engine::takeAction(float target, float current, void (*increase)(), void (*decrease)(), void (*reset)(), int direction) {
+    int desiredDirection = 0;
+    if (current > target) desiredDirection = -1;
+    if (current < target) desiredDirection = 1;
+
+    if (desiredDirection != direction) {
+        if (desiredDirection == 1) increase();
+        else if (desiredDirection == -1) decrease();
+        else reset();
+    }
+
+    return desiredDirection;
 }
 
-bool Engine::actuate(float current, float target, float innerTolerance, float outerTolerance, void (*increase)(), void (*decrease)(), bool state, float calibration) {
+ActuationResults Engine::actuate(float current, float target, float innerTolerance, float outerTolerance, void (*increase)(), void (*decrease)(), void (*reset)(), bool state, int direction, float calibration) {
     current += calibration;
     float minimumInner = target - innerTolerance, maximumInner = target + innerTolerance, minimumOuter = target - outerTolerance, maximumOuter = target + outerTolerance;
 
     // Force FALSE if outside outer bounds. Force TRUE if inside inner bounds. Otherwise, hold current state.
     state = inBetween(current, minimumOuter, maximumOuter) && (inBetween(current, minimumInner, maximumInner) || state);
 
-    if (!state) takeAction(target, current, increase, decrease);
-    return state;
+    if (!state) direction = takeAction(target, current, increase, decrease, reset, direction);
+    else reset();
+    
+    return {state, direction};
 }
 
 // === Public Methods ===
 
-void Engine::registerParameter(String name, float targetValue, float innerTolerance, float outerTolerance, float calibration, float (*readFunction)(), void (*increaseFunction)(), void (*decreaseFunction)()) {
+void Engine::registerParameter(String name, float targetValue, float innerTolerance, float outerTolerance, float calibration, float (*readFunction)(), void (*increaseFunction)(), void (*decreaseFunction)(), void (*resetFunction)()) {
     if (_parameterCount >= _parameterLimit) return;
-    _parameters[_parameterCount++] = {name, targetValue, innerTolerance, outerTolerance, calibration, false, readFunction, increaseFunction, decreaseFunction};
+    _parameters[_parameterCount++] = {name, targetValue, innerTolerance, outerTolerance, calibration, false, 0, readFunction, increaseFunction, decreaseFunction, resetFunction};
     Serial.println("[Engine] Registered parameter: " + name);
 }
 
@@ -53,7 +64,10 @@ void Engine::updateFromJSON(String jsonPayload) {
 void Engine::run(int verbose) {
     for (int i = 0; i < _parameterCount; i++) {
         float currentValue = _parameters[i].readFunction();
-        _parameters[i].state = actuate(currentValue, _parameters[i].targetValue, _parameters[i].innerTolerance, _parameters[i].outerTolerance, _parameters[i].increaseFunction, _parameters[i].decreaseFunction, _parameters[i].state, _parameters[i].calibration);
+        ActuationResults results = actuate(currentValue, _parameters[i].targetValue, _parameters[i].innerTolerance, _parameters[i].outerTolerance, _parameters[i].increaseFunction, _parameters[i].decreaseFunction, _parameters[i].resetFunction, _parameters[i].state, _parameters[i].direction, _parameters[i].calibration);
+        _parameters[i].state = results.state;
+        _parameters[i].direction = results.direction;
+
         if (verbose > 0) {
             Serial.println("[Engine] " + _parameters[i].name + ": " + String(currentValue));
         }
