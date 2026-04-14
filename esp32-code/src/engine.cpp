@@ -25,7 +25,13 @@ ActuationResults Engine::actuate(float current, float target, float innerToleran
     float minimumInner = target - innerTolerance, maximumInner = target + innerTolerance, minimumOuter = target - outerTolerance, maximumOuter = target + outerTolerance;
 
     // Force FALSE if outside outer bounds. Force TRUE if inside inner bounds. Otherwise, hold current state.
-    state = inBetween(current, minimumOuter, maximumOuter) && (inBetween(current, minimumInner, maximumInner) || state);
+    bool newState = inBetween(current, minimumOuter, maximumOuter) && (inBetween(current, minimumInner, maximumInner) || state);
+
+    if (state && !newState) {
+        direction = 0;
+    }
+    
+    state = newState;
 
     if (!state) direction = takeAction(target, current, increase, decrease, reset, direction);
     else reset();
