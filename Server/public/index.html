@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Fawawwa — Smart Greenhouse Control System">
+  <title>Fawawwa</title>
+
+  <!-- Google Material Symbols -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <!-- Kanit font weights from Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Tab Contents -->
+    <main id="tab-content">
+
+      <!-- TAB 0: Connect -->
+      <section id="tab-connect" class="tab-pane active">
+        <div class="tab-header">
+          <h1>Connect</h1>
+        </div>
+        <div id="connect-content">
+          <!-- Disconnected state -->
+          <div id="connect-login" class="connect-login">
+            <div class="login-card">
+              <div class="login-icon-wrap">
+                <span class="material-symbols-outlined login-icon">lock</span>
+              </div>
+              <p class="login-subtitle">Enter your server password to connect</p>
+              <div class="input-group">
+                <input type="password" id="password-input" placeholder="Password" autocomplete="off">
+                <button id="connect-btn" class="btn-primary">
+                  <span class="material-symbols-outlined">arrow_forward</span>
+                </button>
+              </div>
+              <p id="connect-error" class="error-text"></p>
+            </div>
+          </div>
+
+          <!-- Connected state -->
+          <div id="connect-connected" class="connect-connected hidden">
+            <div class="connection-status-bar">
+              <div class="status-dot online"></div>
+              <span>Connected</span>
+              <button id="disconnect-btn" class="btn-text">Disconnect</button>
+            </div>
+            <div id="esp-list" class="esp-list">
+              <!-- ESP cards rendered by JS -->
+            </div>
+            <div id="no-esp-msg" class="empty-state hidden">
+              <span class="material-symbols-outlined empty-icon">sensors_off</span>
+              <p>No ESP devices connected</p>
+            </div>
+            <button id="add-virtual-esp-btn" class="btn-ghost" style="width: 100%; margin-top: var(--space-md);">
+              <span class="material-symbols-outlined" style="font-size: 18px; margin-right: 4px; vertical-align: middle;">add_circle</span>
+              Simulate Virtual ESP
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 1: Control -->
+      <section id="tab-control" class="tab-pane">
+        <div class="tab-header">
+          <h1>Control</h1>
+          <p id="control-subtitle" class="tab-subtitle">No ESP in manual mode</p>
+        </div>
+        <div id="control-content" class="control-content disabled-overlay">
+          <div id="control-fields">
+            <!-- Actuator fields rendered by JS -->
+          </div>
+          <div id="control-disabled-msg" class="overlay-msg">
+            <span class="material-symbols-outlined">do_not_touch</span>
+            <p>Set an ESP to manual mode in the Connect tab to control actuators</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: Monitor -->
+      <section id="tab-monitor" class="tab-pane">
+        <div class="tab-header">
+          <h1>Monitor</h1>
+        </div>
+        <div id="monitor-content">
+          <div id="monitor-sections">
+            <!-- Monitor sections rendered by JS -->
+          </div>
+          <div id="monitor-empty" class="empty-state">
+            <span class="material-symbols-outlined empty-icon">monitor_heart</span>
+            <p>Waiting for ESP data...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: Test Plan -->
+      <section id="tab-testplan" class="tab-pane">
+        <div class="tab-header">
+          <h1>Test Plan</h1>
+        </div>
+        <div class="empty-state coming-soon">
+          <span class="material-symbols-outlined empty-icon">science</span>
+          <p>Coming Soon</p>
+          <span class="coming-soon-sub">Test plans will be available in a future update</span>
+        </div>
+      </section>
+
+      <!-- TAB 4: Edit -->
+      <section id="tab-edit" class="tab-pane">
+        <div class="tab-header edit-header">
+          <h1>Edit</h1>
+          <div class="edit-actions">
+            <button id="revert-btn" class="btn-ghost" disabled>Revert</button>
+            <button id="apply-btn" class="btn-primary-sm" disabled>Apply</button>
+          </div>
+        </div>
+        <div id="edit-content">
+          <div id="edit-parameters">
+            <!-- Edit parameter sections rendered by JS -->
+          </div>
+          <div class="preset-section">
+            <label class="preset-label">Presets</label>
+            <div class="preset-select-wrap">
+              <select id="preset-select">
+                <option value="">Select a preset...</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav id="bottom-nav">
+      <div class="nav-indicator" id="nav-indicator"></div>
+      <button class="nav-item active" data-tab="0" id="nav-connect">
+        <span class="material-symbols-outlined nav-icon">sensors</span>
+      </button>
+      <button class="nav-item" data-tab="1" id="nav-control">
+        <span class="material-symbols-outlined nav-icon">tune</span>
+      </button>
+      <button class="nav-item" data-tab="2" id="nav-monitor">
+        <span class="material-symbols-outlined nav-icon">monitor_heart</span>
+      </button>
+      <button class="nav-item" data-tab="3" id="nav-testplan">
+        <span class="material-symbols-outlined nav-icon">science</span>
+      </button>
+      <button class="nav-item" data-tab="4" id="nav-edit">
+        <span class="material-symbols-outlined nav-icon">edit_note</span>
+      </button>
+    </nav>
+  </div>
+
+  <script src="timeline.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

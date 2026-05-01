@@ -1,0 +1,12 @@
+{
+  "presets": [
+    {
+      "name": "Strawberry",
+      "parameters": {
+        "Temperature": { "target": 17, "inner": 1, "outer": 3 },
+        "Soil Moisture": { "target": 50, "inner": 5, "outer": 20 },
+        "Light": { "target": 300, "inner": 50, "outer": 150 }
+      }
+    }
+  ]
+}

@@ -16,10 +16,17 @@ struct Parameter {
     bool state;
     int direction; 
 
+    String increaseName;
+    String decreaseName;
+
     float (*readFunction)();
     void (*increaseFunction)();
     void (*decreaseFunction)();
     void (*resetFunction)();
+
+    // Manual actuator overrides
+    bool manualIncreaseActive;
+    bool manualDecreaseActive;
 };
 
 class Engine {
@@ -34,7 +41,11 @@ class Engine {
         ActuationResults actuate(float current, float target, float innerTolerance, float outerTolerance, void (*increase)(), void (*decrease)(), void (*reset)(), bool state, int direction, float calibration);
 
     public:
-        void registerParameter(String name, float targetValue, float innerTolerance, float outerTolerance, float calibration, float (*readFunction)(), void (*increaseFunction)(), void (*decreaseFunction)(), void (*resetFunction)());
+        bool automaticMode = true;
+
+        void registerParameter(String name, float targetValue, float innerTolerance, float outerTolerance, float calibration, float (*readFunction)(), void (*increaseFunction)(), void (*decreaseFunction)(), void (*resetFunction)(), String increaseName, String decreaseName);
         void updateFromJSON(String jsonPayload);
+        void setActuator(String parameter, String actuator, bool active);
+        String toJSON();
         void run(int verbose);
 };
