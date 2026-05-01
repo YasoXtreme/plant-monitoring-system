@@ -29,16 +29,16 @@ const int SOIL_MOISTURE_PIN = 35;
 const int DHT_PIN = 27;
 const int FLOW_SENSOR_PIN = 34;
 const int LDR_PIN = 36;
-const int FAN_PIN = 5;
+const int FAN_PIN = 18;
 const int WHITE_LAMP_PIN = 19;
-const int HEAT_LAMP_PIN = 18;
+const int HEAT_LAMP_PIN = 5;
 const int PUMPING_MOTOR_PIN = 23;
 
 // Wi-Fi credentials and server details
 const char* SSID = "Yaso's A15";
 const char* PASSWORD = "SpilledChip9978";
-const char* SERVER_URL = "ws://10.224.227.51:3000/connect-esp";
-const char* SERVER_PASSWORD = "SpilledChip9978";
+const char* SERVER_URL = "ws://10.224.227.25:3000/connect-esp";
+const char* SERVER_PASSWORD = "1234";
 
 // === timezone settings for NTP ===
 const char* ntpServer = "pool.ntp.org"; 

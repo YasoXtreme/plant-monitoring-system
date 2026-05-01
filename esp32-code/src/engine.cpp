@@ -59,13 +59,11 @@ void Engine::updateFromJSON(String jsonPayload) {
     if (type == "set-automatic") {
         automaticMode = doc["automatic"] | true;
         Serial.println("[Engine] Automatic mode set to: " + String(automaticMode ? "ON" : "OFF"));
-        // When switching back to automatic, reset all manual overrides
-        if (automaticMode) {
-            for (int i = 0; i < _parameterCount; i++) {
-                _parameters[i].manualIncreaseActive = false;
-                _parameters[i].manualDecreaseActive = false;
-                _parameters[i].resetFunction();
-            }
+        // When switching mode, reset all actuators
+        for (int i = 0; i < _parameterCount; i++) {
+            _parameters[i].manualIncreaseActive = false;
+            _parameters[i].manualDecreaseActive = false;
+            _parameters[i].resetFunction();
         }
         return;
     }

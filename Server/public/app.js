@@ -312,7 +312,7 @@ function buildControlFields(espId) {
           </div>
           <div class="actuator-toggle">
             <div class="mini-status ${a.active ? 'on' : ''}" data-status="${paramName}-${a.role}"></div>
-            <label class="toggle" onclick="event.stopPropagation()">
+            <label class="toggle">
               <input type="checkbox" ${a.active ? 'checked' : ''}>
               <span class="toggle-track"></span>
               <span class="toggle-thumb"></span>
@@ -341,6 +341,8 @@ $('control-fields').addEventListener('click', (e) => {
   const field = e.target.closest('.actuator-field');
   if (!field || !state.manualEspId) return;
 
+  if (e.target.closest('.toggle')) return;
+
   const espId = field.dataset.esp;
   const param = field.dataset.param;
   const actuator = field.dataset.actuator;
@@ -349,6 +351,17 @@ $('control-fields').addEventListener('click', (e) => {
   toggle.checked = newState;
 
   sendMsg({ type: 'toggle-actuator', espId, parameter: param, actuator, active: newState });
+});
+
+$('control-fields').addEventListener('change', (e) => {
+  if (e.target.type === 'checkbox') {
+    const field = e.target.closest('.actuator-field');
+    if (!field || !state.manualEspId) return;
+    const espId = field.dataset.esp;
+    const param = field.dataset.param;
+    const actuator = field.dataset.actuator;
+    sendMsg({ type: 'toggle-actuator', espId, parameter: param, actuator, active: e.target.checked });
+  }
 });
 
 function updateControlReadings(espId, parameters) {

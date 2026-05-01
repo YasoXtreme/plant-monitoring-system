@@ -23,7 +23,11 @@ function startVirtualEsp() {
       try {
         const data = JSON.parse(msg);
         if (data.type === "set-automatic") {
-          virtualEsps.get(id).automatic = data.automatic;
+          const v = virtualEsps.get(id);
+          v.automatic = data.automatic;
+          v.parameters.forEach(p => {
+            p.actuators.forEach(a => a.active = false);
+          });
         } else if (data.type === "toggle-actuator") {
           const v = virtualEsps.get(id);
           const param = v.parameters.find(p => p.name === data.parameter);
