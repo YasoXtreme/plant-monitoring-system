@@ -16,7 +16,9 @@ const state = {
   monitorTimelines: new Map(), // `${espId}-${paramName}` -> update fn
   presets: [],
   activeTab: 0,
-  hasEdits: false
+  hasEdits: false,
+  testPlans: new Map(), // espId:parameter -> { state, duration }
+  testPlanEspId: ''
 };
 
 // Default param values from ESP code
@@ -136,6 +138,7 @@ function handleMessage(msg) {
       renderConnectTab();
       renderControlTab();
       renderMonitorTab();
+      renderTestPlanTab();
       break;
 
     case 'esp-data':
@@ -167,6 +170,14 @@ function handleMessage(msg) {
 
     case 'actuator-toggled':
       // Will be reflected in next esp-data update
+      break;
+
+    case 'test-plan-update':
+      const tpKey = `${msg.espId}:${msg.parameter}`;
+      state.testPlans.set(tpKey, { state: msg.state, duration: msg.duration });
+      if (state.testPlanEspId === msg.espId && state.activeTab === 3) {
+        renderTestPlanFields();
+      }
       break;
   }
 }
@@ -608,10 +619,107 @@ $('preset-select').addEventListener('change', (e) => {
   checkEditChanges();
 });
 
+// === Test Plan Tab ===
+function renderTestPlanTab() {
+  const select = $('testplan-esp-select');
+  const currentVal = state.testPlanEspId || select.value;
+  select.innerHTML = '<option value="">Select an ESP...</option>';
+  
+  state.esps.forEach((esp, id) => {
+    const shortId = 'ESP-' + id.split(':').slice(-3).join(':');
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = shortId;
+    if (id === currentVal) opt.selected = true;
+    select.appendChild(opt);
+  });
+  
+  state.testPlanEspId = select.value;
+  renderTestPlanFields();
+}
+
+function renderTestPlanFields() {
+  const container = $('testplan-fields');
+  const espId = state.testPlanEspId;
+  
+  if (!espId || !state.esps.has(espId)) {
+    container.classList.add('disabled-overlay');
+    container.innerHTML = '';
+    return;
+  }
+  
+  container.classList.remove('disabled-overlay');
+  
+  const data = state.espData.get(espId);
+  const params = data ? data.parameters : Object.keys(DEFAULT_PARAMS).map(name => ({ name }));
+  
+  let html = '';
+  params.forEach(p => {
+    const name = p.name;
+    const key = `${espId}:${name}`;
+    const plan = state.testPlans.get(key) || { state: 'idle', duration: null };
+    const css = PARAM_CSS[name] || '';
+    
+    let btnText = 'Start Test Plan';
+    let btnClass = 'btn-primary-sm';
+    let isRunning = false;
+    let statusHtml = '<span class="material-symbols-outlined">info</span> Ready to test';
+    
+    if (plan.state === 'waiting_for_deviation') {
+      btnText = 'End Test';
+      btnClass = 'btn-ghost';
+      isRunning = true;
+      statusHtml = '<span class="material-symbols-outlined">hourglass_empty</span> Waiting for deviation...';
+    } else if (plan.state === 'recording_duration') {
+      btnText = 'End Test';
+      btnClass = 'btn-ghost';
+      isRunning = true;
+      statusHtml = '<span class="material-symbols-outlined">fiber_manual_record</span> Recording duration...';
+    } else if (plan.state === 'finished') {
+      statusHtml = `<span class="material-symbols-outlined">check_circle</span> Response time: ${plan.duration.toFixed(1)}s`;
+    }
+    
+    html += `
+      <div class="testplan-field ${css}">
+        <div class="testplan-field-header">
+          <div class="testplan-param-name ${css}">${name}</div>
+          <button class="testplan-btn ${btnClass}" data-esp="${espId}" data-param="${name}" data-running="${isRunning}">${btnText}</button>
+        </div>
+        <div class="testplan-status ${plan.state === 'recording_duration' ? 'recording' : ''} ${plan.state === 'finished' ? 'finished' : ''}">
+          ${statusHtml}
+        </div>
+      </div>
+    `;
+  });
+  
+  container.innerHTML = html;
+}
+
+$('testplan-esp-select').addEventListener('change', (e) => {
+  state.testPlanEspId = e.target.value;
+  renderTestPlanFields();
+});
+
+$('testplan-fields').addEventListener('click', (e) => {
+  const btn = e.target.closest('.testplan-btn');
+  if (!btn) return;
+  
+  const espId = btn.dataset.esp;
+  const param = btn.dataset.param;
+  const isRunning = btn.dataset.running === 'true';
+  
+  if (isRunning) {
+    sendMsg({ type: 'end-test-plan', espId, parameter: param });
+  } else {
+    sendMsg({ type: 'start-test-plan', espId, parameter: param });
+  }
+});
+
 // === Init ===
 function init() {
   renderEditTab();
   loadPresets();
+  renderTestPlanTab();
 
   // Auto-reconnect from saved session
   const savedPass = sessionStorage.getItem('fawawwa_pass');

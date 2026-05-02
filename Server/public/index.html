@@ -103,10 +103,18 @@
         <div class="tab-header">
           <h1>Test Plan</h1>
         </div>
-        <div class="empty-state coming-soon">
-          <span class="material-symbols-outlined empty-icon">science</span>
-          <p>Coming Soon</p>
-          <span class="coming-soon-sub">Test plans will be available in a future update</span>
+        <div id="testplan-content">
+          <div class="preset-section" style="margin-bottom: var(--space-lg);">
+            <label class="preset-label">Target ESP</label>
+            <div class="preset-select-wrap">
+              <select id="testplan-esp-select">
+                <option value="">Select an ESP...</option>
+              </select>
+            </div>
+          </div>
+          <div id="testplan-fields" class="testplan-fields disabled-overlay">
+            <!-- Test plan fields rendered by JS -->
+          </div>
         </div>
       </section>
 

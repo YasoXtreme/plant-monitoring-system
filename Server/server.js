@@ -13,6 +13,7 @@ let appConnection = null;
 let manualEspId = null;
 let lastManualEspId = null;
 const virtualEsps = new Map();
+const activeTestPlans = new Map(); // key: "espId:parameterName"
 
 function startVirtualEsp() {
   const id = "VIRTUAL:" + Math.floor(Math.random() * 10000).toString().padStart(4, '0');
@@ -115,6 +116,8 @@ function startVirtualEsp() {
     const dataMsg = { type: "sensor-data", parameters: vEsp.parameters };
     espLatestData.set(id, dataMsg);
 
+    evaluateTestPlans(id, vEsp.parameters);
+
     if (appConnection && appConnection.readyState === 1) {
       appConnection.send(JSON.stringify({
         type: "esp-data",
@@ -177,6 +180,8 @@ app.ws("/connect-esp", (ws, req) => {
       if (data.type === "sensor-data") {
         // Store latest data for this ESP
         espLatestData.set(deviceId, data);
+
+        evaluateTestPlans(deviceId, data.parameters);
 
         // Forward to app if connected
         if (appConnection && appConnection.readyState === 1) {
@@ -406,9 +411,94 @@ function handleAppMessage(data) {
       break;
     }
 
+    case "start-test-plan": {
+      const { espId, parameter } = data;
+      const espData = espLatestData.get(espId);
+      if (!espData) return;
+      const paramData = espData.parameters.find(p => p.name === parameter);
+      if (!paramData) return;
+
+      const key = `${espId}:${parameter}`;
+      activeTestPlans.set(key, { 
+        state: 'waiting_for_deviation', 
+        startTime: null, 
+        duration: null, 
+        target: paramData.target, 
+        inner: paramData.inner, 
+        outer: paramData.outer 
+      });
+      
+      if (appConnection && appConnection.readyState === 1) {
+        appConnection.send(JSON.stringify({
+          type: "test-plan-update",
+          espId,
+          parameter,
+          state: 'waiting_for_deviation',
+          duration: null
+        }));
+      }
+      break;
+    }
+
+    case "end-test-plan": {
+      const { espId, parameter } = data;
+      const key = `${espId}:${parameter}`;
+      activeTestPlans.delete(key);
+      
+      if (appConnection && appConnection.readyState === 1) {
+        appConnection.send(JSON.stringify({
+          type: "test-plan-update",
+          espId,
+          parameter,
+          state: 'idle',
+          duration: null
+        }));
+      }
+      break;
+    }
+
     default:
       console.log(`[APP] Unknown message type: ${data.type}`);
   }
+}
+
+function evaluateTestPlans(espId, parameters) {
+  parameters.forEach(p => {
+    const key = `${espId}:${p.name}`;
+    const plan = activeTestPlans.get(key);
+    if (!plan) return;
+
+    let updated = false;
+
+    if (plan.state === 'waiting_for_deviation') {
+      if (p.current > plan.target + plan.outer || p.current < plan.target - plan.outer) {
+        plan.state = 'recording_duration';
+        plan.startTime = Date.now();
+        updated = true;
+      }
+    } else if (plan.state === 'recording_duration') {
+      if (p.current <= plan.target + plan.inner && p.current >= plan.target - plan.inner) {
+        plan.state = 'finished';
+        plan.duration = (Date.now() - plan.startTime) / 1000;
+        updated = true;
+      }
+    }
+
+    if (updated) {
+      if (appConnection && appConnection.readyState === 1) {
+        appConnection.send(JSON.stringify({
+          type: "test-plan-update",
+          espId,
+          parameter: p.name,
+          state: plan.state,
+          duration: plan.duration
+        }));
+      }
+      if (plan.state === 'finished') {
+        activeTestPlans.delete(key);
+      }
+    }
+  });
 }
 
 function broadcastEspListToApp() {

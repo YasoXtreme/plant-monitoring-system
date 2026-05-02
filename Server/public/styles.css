@@ -914,3 +914,73 @@ button, .toggle, .actuator-field, .nav-item, .drag-handle {
     margin-bottom: calc(var(--space-md) + env(safe-area-inset-bottom));
   }
 }
+
+/* --- Test Plan Tab --- */
+.testplan-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  transition: opacity 0.3s;
+}
+
+.testplan-fields.disabled-overlay {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.testplan-field {
+  background: var(--off-white);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  border-left: 4px solid transparent;
+}
+
+.testplan-field.temp { border-left-color: var(--temp-color); }
+.testplan-field.moisture { border-left-color: var(--moisture-color); }
+.testplan-field.light { border-left-color: var(--light-color); }
+
+.testplan-field-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.testplan-param-name {
+  font-weight: 600;
+  font-size: var(--fs-md);
+}
+
+.testplan-param-name.temp { color: var(--temp-color); }
+.testplan-param-name.moisture { color: var(--moisture-color); }
+.testplan-param-name.light { color: var(--light-color); }
+
+.testplan-status {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 24px;
+}
+
+.testplan-status .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.testplan-status.recording {
+  color: var(--salmon);
+  animation: pulse-text 2s infinite;
+}
+
+.testplan-status.finished {
+  color: var(--success);
+}
+
+@keyframes pulse-text {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
